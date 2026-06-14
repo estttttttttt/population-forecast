@@ -1,0 +1,726 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>연령대별 인구 예측</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&family=Space+Mono:wght@400;700&display=swap');
+  :root {
+    --bg:#0d0f14; --surface:#161920; --surface2:#1e2230; --border:#2a2f3e;
+    --accent:#4fffb0; --accent2:#ff6b6b; --accent3:#ffd166;
+    --text:#e8eaf0; --text-muted:#7a80a0;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{background:var(--bg);color:var(--text);font-family:'Noto Sans KR',sans-serif;min-height:100vh;}
+  header{padding:32px 40px 24px;border-bottom:1px solid var(--border);display:flex;align-items:flex-end;gap:20px;}
+  .header-label{font-family:'Space Mono',monospace;font-size:11px;color:var(--accent);letter-spacing:.15em;text-transform:uppercase;margin-bottom:6px;}
+  h1{font-size:28px;font-weight:700;letter-spacing:-.02em;}
+  .header-sub{font-size:13px;color:var(--text-muted);margin-left:auto;font-family:'Space Mono',monospace;}
+  main{display:grid;grid-template-columns:260px 1fr;min-height:calc(100vh - 89px);}
+  aside{border-right:1px solid var(--border);padding:24px 20px;background:var(--surface);}
+  .section-label{font-size:10px;font-family:'Space Mono',monospace;color:var(--text-muted);letter-spacing:.12em;text-transform:uppercase;margin-bottom:12px;}
+  .age-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:24px;}
+  .age-btn{background:var(--surface2);border:1px solid var(--border);color:var(--text-muted);padding:8px 6px;border-radius:6px;font-size:13px;font-family:'Noto Sans KR',sans-serif;cursor:pointer;transition:all .15s;text-align:center;}
+  .age-btn:hover{border-color:var(--accent);color:var(--text);}
+  .age-btn.active{background:rgba(79,255,176,.1);border-color:var(--accent);color:var(--accent);font-weight:500;}
+  .btn-all{width:100%;background:var(--surface2);border:1px solid var(--border);color:var(--text-muted);padding:9px;border-radius:6px;font-size:12px;font-family:'Noto Sans KR',sans-serif;cursor:pointer;transition:all .15s;margin-bottom:24px;}
+  .btn-all:hover{border-color:var(--accent3);color:var(--accent3);}
+  .control-group{margin-bottom:20px;}
+  label{display:block;font-size:12px;color:var(--text-muted);margin-bottom:8px;}
+  select,input[type=range]{width:100%;background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:8px 10px;border-radius:6px;font-size:13px;font-family:'Noto Sans KR',sans-serif;appearance:none;cursor:pointer;}
+  select:focus{outline:1px solid var(--accent);}
+  input[type=range]{padding:4px 0;border:none;background:transparent;accent-color:var(--accent);}
+  .range-display{font-family:'Space Mono',monospace;font-size:18px;color:var(--accent);margin-bottom:4px;}
+  .divider{border:none;border-top:1px solid var(--border);margin:20px 0;}
+  .stat-box{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:12px 14px;margin-bottom:8px;}
+  .stat-label{font-size:11px;color:var(--text-muted);margin-bottom:4px;}
+  .stat-value{font-family:'Space Mono',monospace;font-size:14px;color:var(--accent);}
+  .stat-sub{font-family:'Space Mono',monospace;font-size:10px;color:var(--text-muted);margin-top:3px;}
+  .stat-value.negative{color:var(--accent2);}
+  .stat-value.neutral{color:var(--accent3);}
+  .chart-area{padding:28px 32px;display:flex;flex-direction:column;gap:24px;}
+  .chart-header{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;}
+  .chart-title{font-size:16px;font-weight:500;}
+  .legend-row{display:flex;gap:16px;font-size:12px;color:var(--text-muted);flex-wrap:wrap;}
+  .legend-dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:5px;}
+  .legend-band{display:inline-block;width:14px;height:8px;border-radius:2px;margin-right:5px;opacity:.4;}
+  .chart-wrap{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px;position:relative;height:380px;}
+  .chart-wrap canvas{max-height:100%;}
+  .bottom-row{display:grid;grid-template-columns:1fr 1fr;gap:20px;}
+  .mini-chart-wrap{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px 18px;}
+  .mini-title{font-size:12px;color:var(--text-muted);margin-bottom:12px;font-family:'Space Mono',monospace;}
+  .forecast-table{width:100%;border-collapse:collapse;font-size:12px;}
+  .forecast-table th{text-align:left;color:var(--text-muted);font-weight:400;padding:4px 8px 8px;border-bottom:1px solid var(--border);font-family:'Space Mono',monospace;font-size:11px;}
+  .forecast-table td{padding:6px 8px;border-bottom:1px solid rgba(42,47,62,.5);font-family:'Space Mono',monospace;font-size:11px;}
+  .forecast-table tr:last-child td{border-bottom:none;}
+  .tag-up{color:var(--accent);}
+  .tag-down{color:var(--accent2);}
+  .model-badge{display:inline-block;font-family:'Space Mono',monospace;font-size:10px;padding:2px 7px;border-radius:4px;background:rgba(79,255,176,.1);color:var(--accent);border:1px solid rgba(79,255,176,.3);margin-left:8px;}
+  .ci-badge{display:inline-block;font-family:'Space Mono',monospace;font-size:10px;padding:2px 7px;border-radius:4px;background:rgba(255,209,102,.08);color:var(--accent3);border:1px solid rgba(255,209,102,.25);margin-left:6px;}
+  .info-box{background:rgba(79,255,176,.04);border:1px solid rgba(79,255,176,.15);border-radius:8px;padding:10px 13px;font-size:11px;color:var(--text-muted);line-height:1.6;margin-bottom:12px;}
+  .info-box b{color:var(--accent3);}
+  @media(max-width:900px){main{grid-template-columns:1fr;}aside{border-right:none;border-bottom:1px solid var(--border);}.bottom-row{grid-template-columns:1fr;}}
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <div class="header-label">Statistical Estimation · Population Analytics</div>
+    <h1>연령대별 인구 예측 시스템</h1>
+  </div>
+  <div class="header-sub">데이터 기준: 2016.2 ~ 2026.2 · 95% 신뢰구간 표시</div>
+</header>
+<main>
+  <aside>
+    <div class="section-label">연령대 선택</div>
+    <div class="age-grid" id="ageBtns"></div>
+    <button class="btn-all" onclick="toggleAll()">전체 선택 / 해제</button>
+    <hr class="divider">
+    <div class="section-label">예측 설정</div>
+    <div class="control-group">
+      <label>예측 모델</label>
+      <select id="modelSelect" onchange="updateChart()">
+        <option value="linear">선형 회귀 (Linear)</option>
+        <option value="poly2">2차 다항식 (Polynomial)</option>
+        <option value="exp">지수 평활 (Exponential)</option>
+        <option value="avg">이동평균 (Moving Average)</option>
+      </select>
+    </div>
+    <div class="control-group">
+      <div class="range-display" id="yearDisplay">2030</div>
+      <label>예측 목표 연도</label>
+      <input type="range" id="yearSlider" min="2027" max="2045" value="2030" step="1"
+        oninput="document.getElementById('yearDisplay').textContent=this.value; updateChart()">
+    </div>
+    <div class="info-box">
+      음영 구간 = <b>95% 신뢰구간</b><br>
+      t분포 · 잔차 표준오차(SE) 기반<br>
+      먼 미래일수록 구간이 넓어져요
+    </div>
+    <hr class="divider">
+    <div class="section-label">통계적 추정 요약</div>
+    <div id="statBoxes"></div>
+  </aside>
+
+  <div class="chart-area">
+    <div class="chart-header">
+      <div>
+        <span class="chart-title">인구 추이 및 예측</span>
+        <span class="model-badge" id="modelBadge">LINEAR</span>
+        <span class="ci-badge">95% CI</span>
+      </div>
+      <div class="legend-row">
+        <span><span class="legend-dot" style="background:#4fffb0"></span>실제 데이터</span>
+        <span><span class="legend-dot" style="background:#ffd166"></span>점 추정값</span>
+        <span><span class="legend-band" style="background:#ffd166"></span>95% 신뢰구간</span>
+      </div>
+    </div>
+    <div class="chart-wrap">
+      <canvas id="mainChart"></canvas>
+    </div>
+    <div class="bottom-row">
+      <div class="mini-chart-wrap">
+        <div class="mini-title">// 2026 → 예측연도 변화율 (%) · 95% CI 포함</div>
+        <canvas id="barChart" height="180"></canvas>
+      </div>
+      <div class="mini-chart-wrap">
+        <div class="mini-title">// 연도별 예측값 · 신뢰구간 테이블</div>
+        <table class="forecast-table" id="forecastTable">
+          <thead><tr><th>연도</th><th>점 추정</th><th>95% CI</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+
+    <hr class="divider" style="margin:8px 0;">
+
+    <div class="chart-header">
+      <div>
+        <span class="chart-title">장기요양 복지시설 수요 예측 (60+ 인구 기반)</span>
+        <span class="ci-badge">95% CI</span>
+      </div>
+      <div class="legend-row">
+        <span><span class="legend-dot" style="background:#4fffb0"></span>실제 정원</span>
+        <span><span class="legend-dot" style="background:#ffd166"></span>추세 예측</span>
+        <span><span class="legend-dot" style="background:#ff6b6b"></span>비율유지 필요 정원</span>
+        <span><span class="legend-band" style="background:#ffd166"></span>95% CI</span>
+      </div>
+    </div>
+    <div class="chart-wrap" style="height:320px">
+      <canvas id="careChart"></canvas>
+    </div>
+    <div class="bottom-row">
+      <div class="mini-chart-wrap">
+        <div class="mini-title">// 부담 지수 (정원 1,000명당 노인 수) · 낮을수록 여유</div>
+        <canvas id="burdenChart" height="180"></canvas>
+      </div>
+      <div class="mini-chart-wrap">
+        <div class="mini-title">// 시설 확충 시나리오 (통계적 추정)</div>
+        <table class="forecast-table" id="careTable">
+          <thead><tr><th>지표</th><th>현재 추세 유지</th><th>비율 유지(확충)</th></tr></thead>
+          <tbody></tbody>
+        </table>
+        <div id="careStats" style="margin-top:14px"></div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<script>
+// ── 원본 데이터 ──────────────────────────────────────────
+const rawData = [
+  {t:2016.2,d10:4874,d20:4799,d30:5185,d40:7342,d50:9460,d60:7738,d70:6083,d80:3057,d90:377},
+  {t:2016.8,d10:4754,d20:4778,d30:5093,d40:7242,d50:9348,d60:8015,d70:6043,d80:3188,d90:395},
+  {t:2017.2,d10:4587,d20:4772,d30:4936,d40:7133,d50:9394,d60:8171,d70:6065,d80:3296,d90:409},
+  {t:2017.8,d10:4475,d20:4699,d30:4773,d40:7030,d50:9271,d60:8465,d70:6063,d80:3367,d90:418},
+  {t:2018.2,d10:4416,d20:4737,d30:4617,d40:6956,d50:9261,d60:8677,d70:6108,d80:3405,d90:443},
+  {t:2018.8,d10:4320,d20:4663,d30:4518,d40:6817,d50:9293,d60:8857,d70:6121,d80:3497,d90:454},
+  {t:2019.2,d10:4207,d20:4584,d30:4397,d40:6658,d50:9257,d60:9030,d70:6161,d80:3595,d90:482},
+  {t:2019.8,d10:4123,d20:4575,d30:4298,d40:6506,d50:9290,d60:9171,d70:6141,d80:3687,d90:509},
+  {t:2020.2,d10:4045,d20:4547,d30:4095,d40:6434,d50:9153,d60:9394,d70:6191,d80:3725,d90:544},
+  {t:2020.8,d10:3935,d20:4445,d30:3980,d40:6336,d50:9103,d60:9679,d70:6297,d80:3730,d90:574},
+  {t:2021.2,d10:3859,d20:4327,d30:3843,d40:6218,d50:8903,d60:10018,d70:6337,d80:3785,d90:589},
+  {t:2021.8,d10:3800,d20:4216,d30:3753,d40:6104,d50:8763,d60:10367,d70:6342,d80:3846,d90:610},
+  {t:2022.2,d10:3740,d20:4037,d30:3603,d40:6029,d50:8741,d60:10529,d70:6370,d80:3948,d90:613},
+  {t:2022.8,d10:3711,d20:3982,d30:3481,d40:5999,d50:8626,d60:10682,d70:6432,d80:4097,d90:624},
+  {t:2023.2,d10:3672,d20:3835,d30:3330,d40:5824,d50:8444,d60:10849,d70:6424,d80:4188,d90:668},
+  {t:2023.8,d10:3660,d20:3758,d30:3265,d40:5680,d50:8486,d60:10928,d70:6477,d80:4182,d90:712},
+  {t:2024.2,d10:3579,d20:3707,d30:3173,d40:5507,d50:8547,d60:10884,d70:6587,d80:4152,d90:719},
+  {t:2024.8,d10:3549,d20:3631,d30:3108,d40:5359,d50:8442,d60:10873,d70:6741,d80:4149,d90:737},
+  {t:2025.2,d10:3508,d20:3479,d30:3069,d40:5238,d50:8342,d60:10863,d70:6984,d80:4084,d90:779},
+  {t:2025.8,d10:3501,d20:3440,d30:3162,d40:5181,d50:8381,d60:10940,d70:7226,d80:4050,d90:835},
+  {t:2026.2,d10:3524,d20:3744,d30:3365,d40:5239,d50:8683,d60:11415,d70:7595,d80:3990,d90:881},
+];
+const facilityData = [
+  {y:2016,facCap:299,groupCap:72},
+  {y:2017,facCap:329,groupCap:54},
+  {y:2018,facCap:314,groupCap:54},
+  {y:2019,facCap:377,groupCap:45},
+  {y:2020,facCap:377,groupCap:36},
+  {y:2021,facCap:377,groupCap:45},
+  {y:2022,facCap:383,groupCap:36},
+  {y:2023,facCap:412,groupCap:36},
+  {y:2024,facCap:482,groupCap:36},
+];
+const ages=['10대','20대','30대','40대','50대','60대','70대','80대','90대'];
+const keys=['d10','d20','d30','d40','d50','d60','d70','d80','d90'];
+const palette=['#4fffb0','#4fc3ff','#ffd166','#ff6b6b','#c77dff','#f9844a','#90e0ef','#b5e48c','#ff99c8'];
+
+// ── t분포 임계값 근사 (df 자유도, 95% 양측) ────────────────
+// Cornish-Fisher 근사: t_{0.025,df} ≈ z + (z³+z)/(4df) - ...
+// 실용적으로 충분히 정확한 수치 테이블 기반 근사
+function tCritical95(df) {
+  if(df<=0) return Infinity;
+  if(df===1) return 12.706;
+  if(df===2) return 4.303;
+  if(df===3) return 3.182;
+  if(df===4) return 2.776;
+  if(df===5) return 2.571;
+  if(df===6) return 2.447;
+  if(df===7) return 2.365;
+  if(df===8) return 2.306;
+  if(df===9) return 2.262;
+  if(df===10) return 2.228;
+  if(df<=15) return 2.131;
+  if(df<=20) return 2.086;
+  if(df<=30) return 2.042;
+  if(df<=60) return 2.000;
+  return 1.960; // z정규분포 근사
+}
+
+// ── 선형회귀 + 통계적 추정 ─────────────────────────────────
+// 반환: { fn, se, xbar, sxx, n, residSE, r2 }
+// 신뢰구간: fn(x) ± t * se_pred(x)
+// se_pred(x) = residSE * sqrt(1 + 1/n + (x-xbar)²/sxx)  ← 예측구간(prediction interval)
+// 참고: 신뢰구간(CI)보다 예측구간(PI)이 더 넓고 실용적
+function linRegStat(xs, ys) {
+  const n = xs.length;
+  const xbar = xs.reduce((a,b)=>a+b)/n;
+  const ybar = ys.reduce((a,b)=>a+b)/n;
+  let sxx=0, sxy=0;
+  for(let i=0;i<n;i++){ sxx+=(xs[i]-xbar)**2; sxy+=(xs[i]-xbar)*(ys[i]-ybar); }
+  const b = sxy/sxx, a = ybar - b*xbar;
+  const fn = x => a + b*x;
+  // 잔차제곱합 → 잔차 표준오차 (자유도 n-2)
+  let sse=0;
+  for(let i=0;i<n;i++) sse+=(ys[i]-fn(xs[i]))**2;
+  const residSE = Math.sqrt(sse/(n-2));
+  // 결정계수 R²
+  let sst=0; for(let i=0;i<n;i++) sst+=(ys[i]-ybar)**2;
+  const r2 = 1 - sse/sst;
+  // 예측구간 반폭 계산 함수
+  const t = tCritical95(n-2);
+  const piHalf = x => t * residSE * Math.sqrt(1 + 1/n + (x-xbar)**2/sxx);
+  return { fn, piHalf, residSE, r2, n };
+}
+
+// ── 모델별 통계 래퍼 ──────────────────────────────────────
+// 각 모델도 { fn, piHalf, residSE, r2, n } 형태로 통일
+function linRegModel(xs, ys) { return linRegStat(xs, ys); }
+
+function poly2Model(xs, ys) {
+  const n = xs.length;
+  // 정규방정식 풀기 (가우스 소거)
+  let s0=n,s1=0,s2=0,s3=0,s4=0,t0=0,t1=0,t2=0;
+  for(let i=0;i<n;i++){
+    const x=xs[i],y=ys[i];
+    s1+=x;s2+=x*x;s3+=x*x*x;s4+=x*x*x*x;
+    t0+=y;t1+=x*y;t2+=x*x*y;
+  }
+  const A=[[s0,s1,s2,t0],[s1,s2,s3,t1],[s2,s3,s4,t2]];
+  for(let c=0;c<3;c++){
+    let mx=c; for(let r=c+1;r<3;r++) if(Math.abs(A[r][c])>Math.abs(A[mx][c])) mx=r;
+    [A[c],A[mx]]=[A[mx],A[c]];
+    for(let r=c+1;r<3;r++){const f=A[r][c]/A[c][c]; for(let k=c;k<=3;k++) A[r][k]-=f*A[c][k];}
+  }
+  const co=[0,0,0];
+  for(let i=2;i>=0;i--){co[i]=A[i][3]; for(let j=i+1;j<3;j++) co[i]-=A[i][j]*co[j]; co[i]/=A[i][i];}
+  const fn = x => co[0]+co[1]*x+co[2]*x*x;
+  // 잔차 → SE (자유도 n-3, 파라미터 3개)
+  const df = Math.max(1, n-3);
+  let sse=0, sst=0;
+  const ybar=ys.reduce((a,b)=>a+b)/n;
+  for(let i=0;i<n;i++){sse+=(ys[i]-fn(xs[i]))**2; sst+=(ys[i]-ybar)**2;}
+  const residSE = Math.sqrt(sse/df);
+  const r2 = 1-sse/sst;
+  const t = tCritical95(df);
+  // 2차 모델 예측구간: 선형보다 보수적으로 ×1.3 팩터 적용 (hat matrix 근사)
+  const xbar = xs.reduce((a,b)=>a+b)/n;
+  const sxx = xs.reduce((s,x)=>s+(x-xbar)**2, 0);
+  const piHalf = x => t * residSE * Math.sqrt(1 + 1/n + (x-xbar)**2/sxx) * 1.3;
+  return {fn, piHalf, residSE, r2, n};
+}
+
+function expSmoothModel(xs, ys) {
+  const alpha=0.3;
+  let s=ys[0];
+  const smoothed=[s];
+  for(let i=1;i<ys.length;i++){s=alpha*ys[i]+(1-alpha)*s; smoothed.push(s);}
+  const base = linRegStat(xs, smoothed);
+  // 원 데이터 기준으로 SE 재계산
+  let sse=0,sst=0;
+  const ybar=ys.reduce((a,b)=>a+b)/ys.length;
+  for(let i=0;i<ys.length;i++){sse+=(ys[i]-base.fn(xs[i]))**2; sst+=(ys[i]-ybar)**2;}
+  const df=Math.max(1,ys.length-2);
+  const residSE=Math.sqrt(sse/df);
+  const r2=1-sse/sst;
+  const t=tCritical95(df);
+  const xbar=xs.reduce((a,b)=>a+b)/xs.length;
+  const sxx=xs.reduce((s,x)=>s+(x-xbar)**2,0);
+  const fn = x => Math.max(0, base.fn(x));
+  const piHalf = x => t * residSE * Math.sqrt(1 + 1/xs.length + (x-xbar)**2/sxx);
+  return {fn, piHalf, residSE, r2, n:ys.length};
+}
+
+function movAvgModel(xs, ys) {
+  const w=6;
+  const rxs=xs.slice(-w), rys=ys.slice(-w);
+  const base = linRegStat(rxs, rys);
+  // 전체 데이터 잔차로 SE (과거 잔차까지 포함해야 신뢰구간이 정직함)
+  let sse=0,sst=0;
+  const ybar=ys.reduce((a,b)=>a+b)/ys.length;
+  for(let i=0;i<ys.length;i++){sse+=(ys[i]-base.fn(xs[i]))**2; sst+=(ys[i]-ybar)**2;}
+  const df=Math.max(1,w-2);
+  const residSE=Math.sqrt(sse/ys.length); // 전체 잔차 기준
+  const r2=1-sse/sst;
+  const t=tCritical95(df);
+  const xbar=rxs.reduce((a,b)=>a+b)/w;
+  const sxx=rxs.reduce((s,x)=>s+(x-xbar)**2,0);
+  const fn = x => Math.max(0, base.fn(x));
+  const piHalf = x => t * residSE * Math.sqrt(1 + 1/w + (x-xbar)**2/sxx);
+  return {fn, piHalf, residSE, r2, n:w};
+}
+
+function getModel(model, xs, ys) {
+  if(model==='linear') return linRegModel(xs, ys);
+  if(model==='poly2')  return poly2Model(xs, ys);
+  if(model==='exp')    return expSmoothModel(xs, ys);
+  if(model==='avg')    return movAvgModel(xs, ys);
+}
+
+function elder60plusForYear(y) {
+  const recs=rawData.filter(r=>Math.floor(r.t)===y);
+  const sums=recs.map(r=>r.d60+r.d70+r.d80+r.d90);
+  return sums.reduce((a,b)=>a+b,0)/sums.length;
+}
+
+let activeAges=new Set(ages);
+let mainChart=null,barChart=null,careChart=null,burdenChart=null;
+
+// ── UI 버튼 ──────────────────────────────────────────────
+function buildAgeBtns(){
+  const cont=document.getElementById('ageBtns');
+  ages.forEach(a=>{
+    const b=document.createElement('button');
+    b.className='age-btn active'; b.textContent=a;
+    b.onclick=()=>toggleAge(a,b); cont.appendChild(b);
+  });
+}
+function toggleAge(age,btn){
+  if(activeAges.has(age)){activeAges.delete(age);btn.classList.remove('active');}
+  else{activeAges.add(age);btn.classList.add('active');}
+  updateChart();
+}
+function toggleAll(){
+  const btns=document.querySelectorAll('.age-btn');
+  if(activeAges.size===ages.length){activeAges.clear();btns.forEach(b=>b.classList.remove('active'));}
+  else{ages.forEach(a=>activeAges.add(a));btns.forEach(b=>b.classList.add('active'));}
+  updateChart();
+}
+
+// ── 메인 업데이트 ─────────────────────────────────────────
+function updateChart(){
+  const model=document.getElementById('modelSelect').value;
+  const targetYear=parseInt(document.getElementById('yearSlider').value);
+  const modelNames={linear:'LINEAR',poly2:'POLY-2',exp:'EXP-SMOOTH',avg:'MOV-AVG'};
+  document.getElementById('modelBadge').textContent=modelNames[model];
+
+  const xs=rawData.map(r=>r.t);
+  const lastT=xs[xs.length-1];
+  const forecastXs=[];
+  for(let t=lastT+0.5;t<=targetYear+0.3;t+=0.5) forecastXs.push(parseFloat(t.toFixed(1)));
+  const allX=[...xs,...forecastXs];
+  const allLabels=allX.map(x=>{const y=Math.floor(x);const m=(x%1>0.4)?'8':'2';return `${y}.${m}`;});
+
+  const datasets=[];
+
+  ages.forEach((age,i)=>{
+    if(!activeAges.has(age)) return;
+    const key=keys[i];
+    const ys=rawData.map(r=>r[key]);
+    const {fn,piHalf}=getModel(model,xs,ys);
+    const color=palette[i];
+
+    // 실제 데이터 선
+    datasets.push({
+      label:age, type:'line',
+      data:[...ys,...forecastXs.map(()=>null)],
+      borderColor:color, backgroundColor:color+'22',
+      borderWidth:2, pointRadius:2.5, tension:0.35, spanGaps:false, order:2
+    });
+
+    // 신뢰구간 상단 (투명, fill to lower)
+    const upperData=[...xs.map(()=>null),...forecastXs.map(x=>Math.max(0,fn(x)+piHalf(x)))];
+    datasets.push({
+      label:age+' CI상단', type:'line',
+      data:upperData,
+      borderColor:'transparent',
+      backgroundColor:color+'30',
+      borderWidth:0, pointRadius:0, tension:0.35, spanGaps:false,
+      fill:'+1', order:3
+    });
+    // 신뢰구간 하단
+    const lowerData=[...xs.map(()=>null),...forecastXs.map(x=>Math.max(0,fn(x)-piHalf(x)))];
+    datasets.push({
+      label:age+' CI하단', type:'line',
+      data:lowerData,
+      borderColor:'transparent',
+      backgroundColor:color+'30',
+      borderWidth:0, pointRadius:0, tension:0.35, spanGaps:false,
+      fill:false, order:3
+    });
+    // 점 추정 점선
+    datasets.push({
+      label:age+' 예측', type:'line',
+      data:[...xs.map(()=>null),...forecastXs.map(x=>Math.round(Math.max(0,fn(x))))],
+      borderColor:color, backgroundColor:'transparent',
+      borderWidth:1.8, borderDash:[5,4], pointRadius:1, tension:0.35, spanGaps:false, order:1
+    });
+  });
+
+  if(mainChart) mainChart.destroy();
+  const ctx=document.getElementById('mainChart').getContext('2d');
+  mainChart=new Chart(ctx,{
+    type:'line',
+    data:{labels:allLabels,datasets},
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      interaction:{mode:'index',intersect:false},
+      plugins:{
+        legend:{display:true,labels:{
+          color:'#7a80a0',font:{size:11,family:'Space Mono'},
+          filter:item=>!item.text.includes('CI')&&!item.text.includes('예측'),
+          boxWidth:10,boxHeight:10
+        }},
+        tooltip:{
+          backgroundColor:'#1e2230',borderColor:'#2a2f3e',borderWidth:1,
+          titleColor:'#e8eaf0',bodyColor:'#a0a8c0',
+          titleFont:{family:'Space Mono',size:11},bodyFont:{family:'Noto Sans KR',size:12},
+          filter:item=>!item.dataset.label.includes('CI'),
+          callbacks:{label:c=>`${c.dataset.label}: ${c.parsed.y?.toLocaleString()}명`}
+        }
+      },
+      scales:{
+        x:{ticks:{color:'#7a80a0',font:{size:10,family:'Space Mono'},maxTicksLimit:12},grid:{color:'#1e2230'}},
+        y:{ticks:{color:'#7a80a0',font:{size:10,family:'Space Mono'},callback:v=>v.toLocaleString()},grid:{color:'#2a2f3e'}}
+      }
+    }
+  });
+
+  // ── 변화율 바 차트 ──────────────────────────────────────
+  const targetXExact=targetYear+0.2;
+  const barLabels=[],barVals=[],barColors=[],barErrors=[];
+  ages.forEach((age,i)=>{
+    if(!activeAges.has(age)) return;
+    const key=keys[i], ys=rawData.map(r=>r[key]);
+    const {fn,piHalf}=getModel(model,xs,ys);
+    const last=ys[ys.length-1];
+    const pred=Math.max(0,fn(targetXExact));
+    const pct=((pred-last)/last*100);
+    const errPct=(piHalf(targetXExact)/last*100);
+    barLabels.push(age); barVals.push(+pct.toFixed(1));
+    barColors.push(pct>=0?'#4fffb0':'#ff6b6b');
+    barErrors.push(+errPct.toFixed(1));
+  });
+
+  if(barChart) barChart.destroy();
+  const bctx=document.getElementById('barChart').getContext('2d');
+  barChart=new Chart(bctx,{
+    type:'bar',
+    data:{labels:barLabels,datasets:[
+      {data:barVals,backgroundColor:barColors,borderRadius:4,borderSkipped:false,
+       // 오차 막대 플러그인 없이 시각화하기 위해 CI를 별도 데이터셋으로
+      },
+      {type:'line',label:'±95% CI',data:barVals.map((v,i)=>v+barErrors[i]),
+       borderColor:'rgba(255,209,102,0.5)',backgroundColor:'transparent',
+       borderDash:[3,3],borderWidth:1,pointRadius:3,pointStyle:'line',order:0},
+      {type:'line',data:barVals.map((v,i)=>v-barErrors[i]),
+       borderColor:'rgba(255,209,102,0.5)',backgroundColor:'rgba(255,209,102,0.06)',
+       borderDash:[3,3],borderWidth:1,pointRadius:3,fill:'-1',order:0,label:'_ci_lower'},
+    ]},
+    options:{
+      responsive:true,
+      plugins:{legend:{display:false},tooltip:{
+        backgroundColor:'#1e2230',borderColor:'#2a2f3e',borderWidth:1,
+        titleColor:'#e8eaf0',bodyColor:'#a0a8c0',
+        filter:item=>item.datasetIndex===0,
+        callbacks:{label:c=>`${c.parsed.y>0?'+':''}${c.parsed.y}% (±${barErrors[c.dataIndex]}%)`}
+      }},
+      scales:{
+        x:{ticks:{color:'#7a80a0',font:{size:11}},grid:{display:false}},
+        y:{ticks:{color:'#7a80a0',font:{size:10,family:'Space Mono'},callback:v=>v+'%'},grid:{color:'#2a2f3e'}}
+      }
+    }
+  });
+
+  updateTable(model, xs, targetYear, targetXExact);
+  updateStats(model, xs, targetYear, targetXExact);
+  updateCareSection(model, xs, targetYear, targetXExact);
+}
+
+// ── 예측 테이블 ───────────────────────────────────────────
+function updateTable(model, xs, targetYear, targetXExact){
+  const tbody=document.querySelector('#forecastTable tbody');
+  tbody.innerHTML='';
+  const firstActive=ages.find(a=>activeAges.has(a));
+  if(!firstActive) return;
+  const i=ages.indexOf(firstActive), key=keys[i];
+  const ys=rawData.map(r=>r[key]);
+  const {fn,piHalf}=getModel(model,xs,ys);
+
+  let prevVal=Math.round(fn(2026.2));
+  for(let y=2027;y<=targetYear;y++){
+    const x=y+0.2, val=Math.round(Math.max(0,fn(x)));
+    const half=Math.round(piHalf(x));
+    const tr=document.createElement('tr');
+    tr.innerHTML=`<td>${y}</td><td>${val.toLocaleString()}</td><td style="color:#ffd166;font-size:10px">[${Math.max(0,val-half).toLocaleString()}, ${(val+half).toLocaleString()}]</td>`;
+    tbody.appendChild(tr);
+    prevVal=val;
+    if(y-2027>=7){
+      const tr2=document.createElement('tr');
+      tr2.innerHTML=`<td colspan="3" style="color:#7a80a0;text-align:center">···</td>`;
+      tbody.appendChild(tr2); break;
+    }
+  }
+  const finalVal=Math.round(Math.max(0,fn(targetXExact)));
+  const finalHalf=Math.round(piHalf(targetXExact));
+  const baseVal=ys[ys.length-1];
+  const pct=((finalVal-baseVal)/baseVal*100).toFixed(1);
+  const lastRow=document.createElement('tr');
+  lastRow.innerHTML=`
+    <td style="color:#ffd166;font-weight:700">${targetYear}</td>
+    <td style="color:#ffd166">${finalVal.toLocaleString()}</td>
+    <td style="color:#ffd166;font-size:10px">[${Math.max(0,finalVal-finalHalf).toLocaleString()}, ${(finalVal+finalHalf).toLocaleString()}]</td>`;
+  tbody.appendChild(lastRow);
+}
+
+// ── 통계 박스 ─────────────────────────────────────────────
+function updateStats(model, xs, targetYear, targetXExact){
+  const cont=document.getElementById('statBoxes'); cont.innerHTML='';
+  let maxInc=-Infinity,maxIncAge='',maxDec=Infinity,maxDecAge='';
+  let bestR2=-Infinity,bestR2Age='',worstR2=Infinity,worstR2Age='';
+  ages.forEach((age,i)=>{
+    if(!activeAges.has(age)) return;
+    const key=keys[i],ys=rawData.map(r=>r[key]);
+    const {fn,piHalf,r2}=getModel(model,xs,ys);
+    const last=ys[ys.length-1];
+    const pred=Math.max(0,fn(targetXExact));
+    const pct=(pred-last)/last*100;
+    if(pct>maxInc){maxInc=pct;maxIncAge=age;}
+    if(pct<maxDec){maxDec=pct;maxDecAge=age;}
+    if(r2>bestR2){bestR2=r2;bestR2Age=age;}
+    if(r2<worstR2){worstR2=r2;worstR2Age=age;}
+  });
+  const make=(label,val,sub,cls='')=>{
+    const d=document.createElement('div'); d.className='stat-box';
+    d.innerHTML=`<div class="stat-label">${label}</div><div class="stat-value ${cls}">${val}</div>${sub?`<div class="stat-sub">${sub}</div>`:''}`;
+    cont.appendChild(d);
+  };
+  make(`${targetYear} 예측 기준`,'─','t분포 95% 예측구간 적용','neutral');
+  if(maxIncAge) make('가장 큰 증가',`${maxIncAge} +${maxInc.toFixed(1)}%`,`R²기반 추정`,'tag-up');
+  if(maxDecAge&&maxDecAge!==maxIncAge) make('가장 큰 감소',`${maxDecAge} ${maxDec.toFixed(1)}%`,`R²기반 추정`,'negative');
+  if(bestR2Age) make('적합도 최고(R²)',`${bestR2Age} ${(bestR2*100).toFixed(1)}%`,'1에 가까울수록 정확','neutral');
+  if(worstR2Age&&worstR2Age!==bestR2Age) make('적합도 최저(R²)',`${worstR2Age} ${(worstR2*100).toFixed(1)}%`,'신뢰구간 폭 가장 넓음','negative');
+}
+
+// ── 복지시설 예측 (통계적 추정 적용) ─────────────────────────
+function updateCareSection(model, xs, targetYear, targetXExact){
+  const fyears=facilityData.map(f=>f.y);
+  const totalCap=facilityData.map(f=>f.facCap+f.groupCap);
+  const elder=fyears.map(elder60plusForYear);
+  const ratio=totalCap.map((c,i)=>c/elder[i]*1000);
+
+  // 시설 정원 통계 모델
+  const capModel=getModel(model,fyears,totalCap);
+  const capFn=capModel.fn, capPI=capModel.piHalf;
+
+  // 60+ 인구 예측 (모델 적용)
+  const elderKeys=['d60','d70','d80','d90'];
+  function predElder60(targetX){
+    let tot=0;
+    elderKeys.forEach(k=>{const ys=rawData.map(r=>r[k]);tot+=Math.max(0,getModel(model,xs,ys).fn(targetX));});
+    return tot;
+  }
+  function predElder60PI(targetX){
+    // 각 연령대 PI 합산 (독립 가정 → 분산 합산 → sqrt)
+    let varSum=0;
+    elderKeys.forEach(k=>{const ys=rawData.map(r=>r[k]);const h=getModel(model,xs,ys).piHalf(targetX);varSum+=h*h;});
+    return Math.sqrt(varSum);
+  }
+
+  const predElderVal=predElder60(targetXExact);
+  const predElderHalf=predElder60PI(targetXExact);
+  const latestRatio=ratio[ratio.length-1];
+  const trendCapVal=Math.max(0,capFn(targetYear));
+  const trendCapHalf=capPI(targetYear);
+  const requiredCapVal=latestRatio/1000*predElderVal;
+  const requiredCapHalf=latestRatio/1000*predElderHalf;
+
+  const elderNow=elder[elder.length-1];
+  const elderGrowthPct=((predElderVal-elderNow)/elderNow*100);
+  const capGrowthPct=((trendCapVal-(totalCap[totalCap.length-1]))/totalCap[totalCap.length-1]*100);
+  const shortfall=Math.max(0,requiredCapVal-trendCapVal);
+  const burdenTrend=trendCapVal>0?predElderVal/trendCapVal*1000:0;
+  const burdenReliefPct=burdenTrend>0?((burdenTrend-latestRatio)/burdenTrend*100):0;
+
+  // ── 케어 차트 ────────────────────────────────────────────
+  const allFYears=[...fyears];
+  for(let y=fyears[fyears.length-1]+1;y<=targetYear;y++) allFYears.push(y);
+
+  const actualData=totalCap.concat(allFYears.slice(fyears.length).map(()=>null));
+  const lastActualIdx=fyears.length-1;
+
+  const trendLine=allFYears.map((y,i)=>i===lastActualIdx?totalCap[lastActualIdx]:(i>lastActualIdx?Math.max(0,capFn(y)):null));
+  const trendUpper=allFYears.map((y,i)=>i===lastActualIdx?totalCap[lastActualIdx]:(i>lastActualIdx?Math.max(0,capFn(y)+capPI(y)):null));
+  const trendLower=allFYears.map((y,i)=>i===lastActualIdx?totalCap[lastActualIdx]:(i>lastActualIdx?Math.max(0,capFn(y)-capPI(y)):null));
+
+  const reqLine=allFYears.map((y,i)=>{
+    if(i<lastActualIdx) return null;
+    if(i===lastActualIdx) return totalCap[lastActualIdx];
+    return latestRatio/1000*predElder60(y+0.2);
+  });
+  const reqUpper=allFYears.map((y,i)=>{
+    if(i<=lastActualIdx) return null;
+    return latestRatio/1000*(predElder60(y+0.2)+predElder60PI(y+0.2));
+  });
+  const reqLower=allFYears.map((y,i)=>{
+    if(i<=lastActualIdx) return null;
+    return Math.max(0,latestRatio/1000*(predElder60(y+0.2)-predElder60PI(y+0.2)));
+  });
+
+  if(careChart) careChart.destroy();
+  const cctx=document.getElementById('careChart').getContext('2d');
+  careChart=new Chart(cctx,{
+    type:'line',
+    data:{labels:allFYears,datasets:[
+      {label:'시설 정원(실제)',data:actualData,borderColor:'#4fffb0',backgroundColor:'#4fffb022',borderWidth:2,pointRadius:3,tension:0.3,order:1},
+      {label:'추세 예측 CI상단',data:trendUpper,borderColor:'transparent',backgroundColor:'rgba(255,209,102,0.15)',borderWidth:0,pointRadius:0,tension:0.3,fill:'+1',order:3},
+      {label:'추세 예측 CI하단',data:trendLower,borderColor:'transparent',backgroundColor:'rgba(255,209,102,0.15)',borderWidth:0,pointRadius:0,tension:0.3,fill:false,order:3},
+      {label:'현재 추세 예측',data:trendLine,borderColor:'#ffd166',borderWidth:2,borderDash:[5,4],pointRadius:2,tension:0.3,backgroundColor:'transparent',order:2},
+      {label:'필요정원 CI상단',data:reqUpper,borderColor:'transparent',backgroundColor:'rgba(255,107,107,0.12)',borderWidth:0,pointRadius:0,tension:0.3,fill:'+1',order:3},
+      {label:'필요정원 CI하단',data:reqLower,borderColor:'transparent',backgroundColor:'rgba(255,107,107,0.12)',borderWidth:0,pointRadius:0,tension:0.3,fill:false,order:3},
+      {label:'인구비율 유지 필요 정원',data:reqLine,borderColor:'#ff6b6b',borderWidth:2,borderDash:[2,4],pointRadius:2,tension:0.3,backgroundColor:'transparent',order:2},
+    ]},
+    options:{
+      responsive:true,maintainAspectRatio:false,
+      interaction:{mode:'index',intersect:false},
+      plugins:{
+        legend:{labels:{color:'#7a80a0',font:{size:11,family:'Space Mono'},boxWidth:10,boxHeight:10,
+          filter:item=>!item.text.includes('CI')}},
+        tooltip:{
+          backgroundColor:'#1e2230',borderColor:'#2a2f3e',borderWidth:1,
+          titleColor:'#e8eaf0',bodyColor:'#a0a8c0',
+          filter:item=>!item.dataset.label.includes('CI'),
+          callbacks:{label:c=>`${c.dataset.label}: ${c.parsed.y?Math.round(c.parsed.y).toLocaleString():'-'}명`}
+        }
+      },
+      scales:{
+        x:{ticks:{color:'#7a80a0',font:{size:10,family:'Space Mono'}},grid:{color:'#1e2230'}},
+        y:{ticks:{color:'#7a80a0',font:{size:10,family:'Space Mono'},callback:v=>v.toLocaleString()},grid:{color:'#2a2f3e'}}
+      }
+    }
+  });
+
+  // ── 부담 지수 바 차트 ────────────────────────────────────
+  const burdenLabels=[...fyears.map(String),`${targetYear}(추세)`,`${targetYear}(확충)`];
+  const burdenVals=[...ratio.map(v=>+v.toFixed(1)),+burdenTrend.toFixed(1),+latestRatio.toFixed(1)];
+  const burdenColors=fyears.map(()=>'#4fc3ff').concat(['#ff6b6b','#4fffb0']);
+
+  if(burdenChart) burdenChart.destroy();
+  const bctx2=document.getElementById('burdenChart').getContext('2d');
+  burdenChart=new Chart(bctx2,{
+    type:'bar',
+    data:{labels:burdenLabels,datasets:[{data:burdenVals,backgroundColor:burdenColors,borderRadius:4,borderSkipped:false}]},
+    options:{
+      responsive:true,
+      plugins:{legend:{display:false},tooltip:{
+        backgroundColor:'#1e2230',borderColor:'#2a2f3e',borderWidth:1,
+        titleColor:'#e8eaf0',bodyColor:'#a0a8c0',
+        callbacks:{label:c=>`정원 1,000명당 ${c.parsed.y}명(노인)`}
+      }},
+      scales:{
+        x:{ticks:{color:'#7a80a0',font:{size:10}},grid:{display:false}},
+        y:{ticks:{color:'#7a80a0',font:{size:10,family:'Space Mono'}},grid:{color:'#2a2f3e'}}
+      }
+    }
+  });
+
+  // ── 시나리오 테이블 ──────────────────────────────────────
+  const tbody=document.querySelector('#careTable tbody');
+  const row=(label,a,b)=>`<tr><td>${label}</td><td>${a}</td><td>${b}</td></tr>`;
+  tbody.innerHTML=
+    row(`${targetYear} 60+ 인구`,
+      `${Math.round(predElderVal).toLocaleString()}명`,
+      `±${Math.round(predElderHalf).toLocaleString()}명(95%CI)`) +
+    row(`시설 정원 추정`,
+      `${Math.round(trendCapVal).toLocaleString()}명<br><span style="color:#ffd166;font-size:10px">[${Math.max(0,Math.round(trendCapVal-trendCapHalf)).toLocaleString()}, ${Math.round(trendCapVal+trendCapHalf).toLocaleString()}]</span>`,
+      `${Math.round(requiredCapVal).toLocaleString()}명<br><span style="color:#ffd166;font-size:10px">[${Math.max(0,Math.round(requiredCapVal-requiredCapHalf)).toLocaleString()}, ${Math.round(requiredCapVal+requiredCapHalf).toLocaleString()}]</span>`) +
+    row(`부담지수(1k명당)`,`${burdenTrend.toFixed(1)}명`,`${latestRatio.toFixed(1)}명`) +
+    row(`추가 확충 필요`,`-`,`<span class="tag-up">+${Math.round(shortfall).toLocaleString()}명</span>`);
+
+  // ── 통계 박스 ────────────────────────────────────────────
+  const cont=document.getElementById('careStats');
+  const make=(label,val,sub,cls='')=>`<div class="stat-box"><div class="stat-label">${label}</div><div class="stat-value ${cls}">${val}</div>${sub?`<div class="stat-sub">${sub}</div>`:''}</div>`;
+  cont.innerHTML=
+    make(`${targetYear} 60+ 인구 증가율`,`+${elderGrowthPct.toFixed(1)}%`,`기준: 2024년 대비`,'tag-up')+
+    make(`현재 추세 정원 증가율`,`${capGrowthPct>=0?'+':''}${capGrowthPct.toFixed(1)}%`,`95% 예측구간 포함`,capGrowthPct>=0?'tag-up':'negative')+
+    make(`시설 확충 시 부담 감소율`,`-${Math.abs(burdenReliefPct).toFixed(1)}%`,`비율유지 시나리오 기준`,'tag-up');
+}
+
+buildAgeBtns();
+updateChart();
+</script>
+</body>
+</html>
